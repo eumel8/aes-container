@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# create, encrypt, and decrypt an AES container
+# requires openssl only
+#
+if [ $# -lt 1 ]; then
+    echo ""
+    echo "encrypt/decrypt AES container"
+    echo ""
+    echo "usage:"
+    echo "$0 create <container> <sizeMB>"
+    echo "$0 encrypt <container>"
+    echo "$0 decrypt <container>"
+    exit;
+fi
+
+if [[ $1 == "create" ]]; then
+    if [ -f $2.img ]; then
+        echo "file $2.img exists"
+        exit
+    fi
+    dd if=/dev/zero of=$2.img bs=1M count=$3
+    mkfs.vfat $2.img
+    if [ ! -d ./.$2_data ]; then
+        mkdir ./.$2_data
+    fi
+    sudo mount -o loop,uid=$UID ./$2.img ./.$2_data
+    # sudo chown -R $USER ./.$2_data
+    echo "container created and mounted at ./$2_data"
+fi
+if [[ $1 == "encrypt" ]]; then
+    if mount | grep $2_data > /dev/null; then
+        sudo umount ./.$2_data
+    fi
+    echo "enter passphrase:"
+    read -s passphrase
+    if [ -f $2.img.enc ]; then
+        echo "file $2.img.enc exists"
+        exit
+    fi
+    openssl enc -e -aes256 -a -pass pass:$passphrase -in $2.img -out $2.img.enc
+fi
+if [[ $1 == "decrypt" ]]; then
+    if [ ! -d ./.$2_data ]; then
+        mkdir ./.$2_data
+    fi
+    echo "enter passphrase:"
+    read -s passphrase
+    openssl enc -d -aes256 -a -pass pass:$passphrase -in $2.img.enc -out $2.img
+    sudo mount -o loop,uid=$UID ./$2.img ./.$2_data
+fi
+
